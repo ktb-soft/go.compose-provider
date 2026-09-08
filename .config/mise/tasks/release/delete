@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#MISE description="Delete a release tag locally and on origin"
+set -euo pipefail
+
+readonly remote="origin"
+readonly version="${1:-}"
+
+if [[ -z ${version} ]]; then
+  echo "usage: mise run release:delete <version>, for example v0.1.0" >&2
+  exit 1
+fi
+
+if [[ ! ${version} =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  echo "error: ${version} is not a semver tag, expected the vMAJOR.MINOR.PATCH form" >&2
+  exit 1
+fi
+
+cat >&2 <<WARNING
+The Go module proxy caches a version permanently once anything fetches it.
+Deleting ${version} does not withdraw it, and re-tagging the same version
+against different code fails checksum verification for everyone who already
+has it. Publish the next patch version instead unless nothing has fetched
+this tag yet.
+WARNING
+
+if [[ -t 0 ]]; then
+  read -r -p "delete ${version} from ${remote} and locally? [y/N] " reply
+  if [[ ${reply} != [yY] ]]; then
+    echo "aborted"
+    exit 1
+  fi
+fi
+
+if [[ -n $(git ls-remote --tags "${remote}" "refs/tags/${version}") ]]; then
+  git push "${remote}" --delete "refs/tags/${version}"
+else
+  echo "tag ${version} is not on ${remote}"
+fi
+
+if git rev-parse --verify --quiet "refs/tags/${version}" >/dev/null; then
+  git tag --delete "${version}"
+else
+  echo "tag ${version} is not local"
+fi

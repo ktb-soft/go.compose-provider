@@ -110,6 +110,21 @@ What the package handles for you:
 `mise run check` runs `go vet`, `golangci-lint` and the test suite. Tools are
 pinned in `mise.toml`, so `mise install` gets you the same versions CI uses.
 
+Releases are git tags, which is all a Go module needs:
+
+```console
+mise run release:tag v0.1.0      # check, tag, push
+mise run release:delete v0.1.0   # untag locally and on origin
+```
+
+`release:tag` refuses a dirty tree, a tag that already exists, unpushed
+commits, or a failing `mise run check`.
+
+`release:delete` is a last resort. The Go module proxy caches a version
+permanently once anything fetches it, so a deleted tag is not withdrawn, and
+re-tagging the same version against different code fails checksum verification
+for anyone who already has it. Publish the next patch version instead.
+
 ## Reference
 
 The protocol is the Compose extensibility specification, published by Docker at
