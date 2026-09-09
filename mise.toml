@@ -37,3 +37,45 @@ run = "go test ./..."
 [tasks.check]
 description = "Run every guardrail"
 depends = ["vet", "lint", "test"]
+
+[tasks.release]
+description = "Check, then tag a release and push it"
+usage = 'arg "<version>" help="Semver tag to publish, such as v0.1.0"'
+run = '''
+set -euo pipefail
+
+if [[ ! $usage_version =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+  printf 'ERRO | not a semver tag | version=%s want=vMAJOR.MINOR.PATCH\n' "$usage_version" >&2
+  exit 1
+fi
+
+mise run check
+mise run tag:create "$usage_version" --message "Release $usage_version"
+
+module="$(awk '$1 == "module" { print $2; exit }' go.mod)"
+printf 'INFO | warm the module proxy | cmd="go list -m %s@%s"\n' "$module" "$usage_version"
+'''
+
+[tasks."release:delete"]
+description = "Delete a release tag, with the module proxy caveat"
+usage = '''
+arg "<version>" help="Semver tag to delete, such as v0.1.0"
+flag "-y --yes" help="Delete without asking"
+'''
+run = '''
+set -euo pipefail
+
+cat >&2 <<WARNING
+WARN | the Go module proxy caches a version permanently once anything fetches it.
+WARN | deleting $usage_version does not withdraw it, and re-tagging the same
+WARN | version against different code fails checksum verification for everyone
+WARN | who already has it. publish the next patch version instead unless nothing
+WARN | has fetched this tag yet.
+WARNING
+
+if [[ ${usage_yes:-false} == "true" ]]; then
+  mise run tag:delete "$usage_version" --yes
+else
+  mise run tag:delete "$usage_version"
+fi
+'''
